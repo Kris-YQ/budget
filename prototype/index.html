@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Budget Management - V1 Prototype</title>
+  <style>
+    :root { --bg:#f5f7fb; --card:#fff; --text:#1f2a37; --muted:#6b7280; --primary:#2563eb; --danger:#dc2626; --warn:#d97706; --ok:#059669; --border:#e5e7eb; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; background:var(--bg); color:var(--text); }
+    header { background:#111827; color:#fff; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+    .title { font-weight:700; }
+    .tag { font-size:12px; color:#cbd5e1; }
+    .wrap { max-width:1280px; margin:18px auto; padding:0 16px; }
+    .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .tab { border:1px solid var(--border); background:#fff; padding:8px 12px; border-radius:8px; cursor:pointer; }
+    .tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .panel { display:none; }
+    .panel.active { display:block; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:10px; margin-top:10px; overflow:auto; }
+    .card h3 { margin:0; padding:10px 12px; border-bottom:1px solid var(--border); }
+    .card .body { padding:12px; }
+    .grid { display:grid; gap:8px; grid-template-columns: repeat(4,minmax(120px,1fr)); }
+    label { font-size:12px; color:var(--muted); display:block; }
+    input, select { width:100%; padding:8px; border:1px solid var(--border); border-radius:8px; background:#fff; margin-top:4px; }
+    .actions { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
+    button { border:1px solid var(--border); background:#fff; padding:8px 10px; border-radius:8px; cursor:pointer; }
+    .primary { background:var(--primary); color:#fff; border-color:var(--primary); }
+    table { width:100%; border-collapse:collapse; min-width:820px; }
+    th,td { border-bottom:1px solid var(--border); padding:8px; text-align:left; font-size:12px; }
+    th { background:#f8fafc; }
+    .danger { color:var(--danger); font-weight:700; }
+    .ok { color:var(--ok); font-weight:700; }
+    .hint { color:var(--muted); font-size:12px; padding:0 12px 10px; }
+    .kpi { display:grid; grid-template-columns: repeat(5,minmax(110px,1fr)); gap:8px; }
+    .kpi .item { border:1px solid var(--border); border-radius:8px; padding:8px; background:#fbfdff; }
+    .kpi .value { font-size:20px; font-weight:700; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="title">Budget Management System · V1 原型</div>
+  <div class="tag">新增：手动录入所有字段，并自动关联到六个页面</div>
+</header>
+<div class="wrap">
+  <div class="tabs" id="tabs"></div>
+
+  <section class="panel active" data-panel="Data Entry">
+    <div class="card"><h3>数据录入中心（手动输入字段）</h3><div class="body">
+      <div class="grid" id="entryFields"></div>
+      <div class="actions">
+        <button class="primary" id="addRowBtn">新增/更新数据行</button>
+        <button id="loadDemoBtn">加载示例数据</button>
+        <button id="clearBtn">清空数据</button>
+        <button id="pushBackendBtn">保存到BE</button>
+        <button id="pullBackendBtn">从BE加载</button>
+      </div>
+      <div class="hint">输入后点击“新增/更新数据行”，系统会自动在 Dashboard / Resource / Allocation / Gap / BP-Clarity / Import-Export 同步展示。可再点击“保存到BE/从BE加载”。</div>
+    </div></div>
+    <div class="card"><h3>当前数据（Data Source）</h3>
+      <table><thead><tr><th>Resource ID</th><th>Project code</th><th>BP ID</th><th>Clarity ID</th><th>Month</th><th>FTE</th><th>Allocated budget($)</th><th>Gap($)</th></tr></thead><tbody id="dataSourceBody"></tbody></table>
+    </div>
+  </section>
+
+  <section class="panel" data-panel="Dashboard">
+    <div class="card"><h3>Dashboard</h3><div class="body"><div class="kpi">
+      <div class="item"><div>Total Allocated</div><div class="value" id="kpiAllocated">$0</div></div>
+      <div class="item"><div>Total Gap</div><div class="value danger" id="kpiGap">$0</div></div>
+      <div class="item"><div>Overrun BP</div><div class="value" id="kpiOverrun">0</div></div>
+      <div class="item"><div>Received BP / Total</div><div class="value" id="kpiReceived">0/0</div></div>
+      <div class="item"><div>Rows</div><div class="value" id="kpiRows">0</div></div>
+    </div></div></div>
+    <div class="card"><h3>首页主表</h3>
+      <table><thead><tr><th>Resource ID</th><th>Project code</th><th>Resource name</th><th>BP ID</th><th>Allocated budget($)</th></tr></thead><tbody id="dashboardBody"></tbody></table>
+    </div>
+  </section>
+
+  <section class="panel" data-panel="Resource">
+    <div class="card"><h3>Resource 页面</h3>
+      <table><thead><tr><th>Resource ID</th><th>cTool ID</th><th>Name</th><th>Contract Type</th><th>City</th><th>Pod</th><th>Rate($K)</th><th>Role End date</th><th>Gap($)</th></tr></thead><tbody id="resourceBody"></tbody></table>
+    </div>
+  </section>
+
+  <section class="panel" data-panel="Allocation">
+    <div class="card"><h3>Allocation 页面</h3>
+      <table><thead><tr><th>Resource</th><th>Month</th><th>Project code</th><th>BP ID</th><th>Clarity ID</th><th>FTE</th><th>BP Status</th><th>Validation</th></tr></thead><tbody id="allocationBody"></tbody></table>
+      <div class="hint">校验：月总FTE≤1；BP状态必须Received。</div>
+    </div>
+  </section>
+
+  <section class="panel" data-panel="Gap">
+    <div class="card"><h3>Gap 页面</h3>
+      <table><thead><tr><th>Resource ID</th><th>Name</th><th>City</th><th>Annual Gap($)</th><th>Gap Months</th><th>Suggested BP</th></tr></thead><tbody id="gapBody"></tbody></table>
+    </div>
+  </section>
+
+  <section class="panel" data-panel="BP/Clarity">
+    <div class="card"><h3>BP/Clarity 页面</h3>
+      <table><thead><tr><th>BP ID</th><th>Project code</th><th>Status</th><th>Total Budget(K)</th><th>Allocated(K)</th><th>Remaining(K)</th><th>Overrun</th></tr></thead><tbody id="bpBody"></tbody></table>
+    </div>
+  </section>
+
+  <section class="panel" data-panel="Import/Export">
+    <div class="card"><h3>Import 预检查示意（自动比较前后差异）</h3>
+      <table><thead><tr><th>Row Key</th><th>Original</th><th>New</th><th>Changed Fields</th></tr></thead><tbody id="importBody"></tbody></table>
+      <div class="hint">本页会显示最新输入与上一版本的差异字段，用于逐条确认。</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const allFields = [
+  "Resource ID","cTool ID","Resource Name","Contract Type","City","Pod","2026 GPDM Rate($)","Allocate Month","Allocate budget($)","Gap($)",
+  "Project code","Project Name","BP ID","BP Name","Clarity ID","Clarity Name","Role End date","SVS","Supplier Code","Billable Service Code",
+  "Total FTE($)","FTE","BP Status","BP Total Budget(K)","Suggested BP"
+];
+
+const rows = [];
+let previousSnapshot = [];
+
+function el(id){ return document.getElementById(id); }
+function money(n){ return `$${Number(n||0).toFixed(1)}K`; }
+function normalize(v){ return String(v ?? '').trim(); }
+
+function buildEntryFields(){
+  const host = el('entryFields');
+  host.innerHTML = allFields.map(f => `<label>${f}<input data-field="${f}" placeholder="${f}" /></label>`).join('');
+}
+
+function getFormData(){
+  const obj = {};
+  document.querySelectorAll('#entryFields input').forEach(i => obj[i.dataset.field] = normalize(i.value));
+  return obj;
+}
+
+function setDemo(){
+  const demo = {
+    "Resource ID":"R-10021","cTool ID":"CT-7781","Resource Name":"Alex Chen","Contract Type":"Perm","City":"GZ","Pod":"Pod-A",
+    "2026 GPDM Rate($)":"9.182","Allocate Month":"2026-03","Allocate budget($)":"14.6","Gap($)":"0",
+    "Project code":"WHCS-DSP","Project Name":"DSP Platform","BP ID":"2500113","BP Name":"DSP Wallet","Clarity ID":"02026/PR007142","Clarity Name":"DSP Build",
+    "Role End date":"2026-11-30","SVS":"SVS-01","Supplier Code":"SUP-31","Billable Service Code":"BSC-01","Total FTE($)":"1.0","FTE":"1.0",
+    "BP Status":"Received","BP Total Budget(K)":"320","Suggested BP":"2500113"
+  };
+  document.querySelectorAll('#entryFields input').forEach(i => i.value = demo[i.dataset.field] || '');
+}
+
+function upsertRow(){
+  const row = getFormData();
+  const key = `${row['Resource ID']}|${row['Allocate Month']}|${row['Clarity ID']}`;
+  if(!row['Resource ID'] || !row['BP ID'] || !row['Clarity ID']) { alert('请至少填写 Resource ID / BP ID / Clarity ID'); return; }
+  const idx = rows.findIndex(r => `${r['Resource ID']}|${r['Allocate Month']}|${r['Clarity ID']}` === key);
+  if(idx >= 0) rows[idx] = row; else rows.push(row);
+  renderAll();
+}
+
+function clearRows(){
+  rows.length = 0;
+  previousSnapshot = [];
+  renderAll();
+}
+
+function renderDataSource(){
+  el('dataSourceBody').innerHTML = rows.map(r => `<tr><td>${r['Resource ID']}</td><td>${r['Project code']}</td><td>${r['BP ID']}</td><td>${r['Clarity ID']}</td><td>${r['Allocate Month']}</td><td>${r['FTE']||'0'}</td><td>${r['Allocate budget($)']||'0'}</td><td>${r['Gap($)']||'0'}</td></tr>`).join('') || '<tr><td colspan="8">暂无数据</td></tr>';
+}
+
+function renderDashboard(){
+  const totalAllocated = rows.reduce((s,r)=>s+Number(r['Allocate budget($)']||0),0);
+  const totalGap = rows.reduce((s,r)=>s+Number(r['Gap($)']||0),0);
+  const bpMap = {};
+  rows.forEach(r=>{ if(!bpMap[r['BP ID']]) bpMap[r['BP ID']]={status:r['BP Status']||'TBC', total:Number(r['BP Total Budget(K)']||0), allocated:0, project:r['Project code']}; bpMap[r['BP ID']].allocated += Number(r['Allocate budget($)']||0); });
+  const bps = Object.values(bpMap);
+  el('kpiAllocated').textContent = money(totalAllocated);
+  el('kpiGap').textContent = money(totalGap);
+  el('kpiOverrun').textContent = String(bps.filter(b => b.total - b.allocated < 0).length);
+  el('kpiReceived').textContent = `${bps.filter(b=>b.status==='Received').length}/${bps.length}`;
+  el('kpiRows').textContent = String(rows.length);
+  el('dashboardBody').innerHTML = rows.map(r=>`<tr><td>${r['Resource ID']}</td><td>${r['Project code']}</td><td>${r['Resource Name']}</td><td>${r['BP ID']}</td><td>${money(r['Allocate budget($)'])}</td></tr>`).join('') || '<tr><td colspan="5">暂无数据</td></tr>';
+}
+
+function renderResource(){
+  const resMap = {};
+  rows.forEach(r=>{
+    const id = r['Resource ID'];
+    if(!resMap[id]) resMap[id] = { ...r, gap:0 };
+    resMap[id].gap += Number(r['Gap($)']||0);
+  });
+  el('resourceBody').innerHTML = Object.values(resMap).map(r=>`<tr><td>${r['Resource ID']}</td><td>${r['cTool ID']}</td><td>${r['Resource Name']}</td><td>${r['Contract Type']}</td><td>${r['City']}</td><td>${r['Pod']}</td><td>${r['2026 GPDM Rate($)']}</td><td>${r['Role End date']}</td><td class="${r.gap>0?'danger':''}">${money(r.gap)}</td></tr>`).join('') || '<tr><td colspan="9">暂无数据</td></tr>';
+}
+
+function renderAllocation(){
+  const byMonth = {};
+  rows.forEach(r=>{ const key = `${r['Resource ID']}|${r['Allocate Month']}`; byMonth[key]=(byMonth[key]||0)+Number(r['FTE']||0); });
+  el('allocationBody').innerHTML = rows.map(r=>{
+    const key = `${r['Resource ID']}|${r['Allocate Month']}`;
+    const fteValid = byMonth[key] <= 1;
+    const bpValid = (r['BP Status']||'') === 'Received';
+    const txt = fteValid && bpValid ? '<span class="ok">可保存</span>' : '<span class="danger">不可保存</span>';
+    return `<tr><td>${r['Resource ID']}</td><td>${r['Allocate Month']}</td><td>${r['Project code']}</td><td>${r['BP ID']}</td><td>${r['Clarity ID']}</td><td>${r['FTE']||'0'}</td><td>${r['BP Status']||'TBC'}</td><td>${txt}</td></tr>`;
+  }).join('') || '<tr><td colspan="8">暂无数据</td></tr>';
+}
+
+function renderGap(){
+  const map = {};
+  rows.forEach(r=>{
+    const id=r['Resource ID'];
+    if(!map[id]) map[id] = {name:r['Resource Name'], city:r['City'], gap:0, months:new Set(), bp:new Set()};
+    const g = Number(r['Gap($)']||0);
+    map[id].gap += g;
+    if(g>0) map[id].months.add(r['Allocate Month']);
+    if(r['Suggested BP']) map[id].bp.add(r['Suggested BP']);
+  });
+  el('gapBody').innerHTML = Object.entries(map).map(([id,v])=>`<tr><td>${id}</td><td>${v.name}</td><td>${v.city}</td><td class="${v.gap>0?'danger':''}">${money(v.gap)}</td><td>${[...v.months].join(', ') || '-'}</td><td>${[...v.bp].join(', ') || '-'}</td></tr>`).join('') || '<tr><td colspan="6">暂无数据</td></tr>';
+}
+
+function renderBP(){
+  const map = {};
+  rows.forEach(r=>{
+    const id = r['BP ID'];
+    if(!map[id]) map[id] = {project:r['Project code'], status:r['BP Status']||'TBC', total:Number(r['BP Total Budget(K)']||0), allocated:0};
+    map[id].allocated += Number(r['Allocate budget($)']||0);
+  });
+  el('bpBody').innerHTML = Object.entries(map).map(([id,v])=>{
+    const remain = v.total - v.allocated;
+    return `<tr><td>${id}</td><td>${v.project}</td><td>${v.status}</td><td>${v.total.toFixed(1)}</td><td>${v.allocated.toFixed(1)}</td><td class="${remain<0?'danger':''}">${remain.toFixed(1)}</td><td>${remain<0?'Yes':'No'}</td></tr>`;
+  }).join('') || '<tr><td colspan="7">暂无数据</td></tr>';
+}
+
+function renderImport(){
+  const prevMap = Object.fromEntries(previousSnapshot.map(r => [`${r['Resource ID']}|${r['Allocate Month']}|${r['Clarity ID']}`, r]));
+  const body = rows.map(r => {
+    const key = `${r['Resource ID']}|${r['Allocate Month']}|${r['Clarity ID']}`;
+    const old = prevMap[key] || {};
+    const changed = allFields.filter(f => normalize(old[f]) !== normalize(r[f]));
+    return `<tr><td>${key}</td><td>${changed.length? changed.map(f=>`${f}=${old[f]||''}`).join('; '):'-'}</td><td>${changed.length? changed.map(f=>`${f}=${r[f]||''}`).join('; '):'-'}</td><td>${changed.join(', ') || '-'}</td></tr>`;
+  }).join('');
+  el('importBody').innerHTML = body || '<tr><td colspan="4">暂无差异</td></tr>';
+  previousSnapshot = JSON.parse(JSON.stringify(rows));
+}
+
+function renderAll(){ renderDataSource(); renderDashboard(); renderResource(); renderAllocation(); renderGap(); renderBP(); renderImport(); }
+
+async function pushToBackend(){
+  const res = await fetch('http://localhost:8000/api/rows', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({rows})});
+  if(!res.ok) throw new Error('push failed');
+  alert('已保存到BE');
+}
+
+async function pullFromBackend(){
+  const res = await fetch('http://localhost:8000/api/rows');
+  if(!res.ok) throw new Error('pull failed');
+  const data = await res.json();
+  rows.length = 0;
+  (data.rows || []).forEach(r => rows.push(r));
+  renderAll();
+  alert('已从BE加载');
+}
+
+
+function initTabs(){
+  const names = ["Data Entry","Dashboard","Resource","Allocation","Gap","BP/Clarity","Import/Export"];
+  const tabs = el('tabs');
+  const panels = [...document.querySelectorAll('.panel')];
+  names.forEach((n, i)=>{
+    const b=document.createElement('button');
+    b.className='tab'+(i===0?' active':'');
+    b.textContent=n;
+    b.onclick=()=>{ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); b.classList.add('active'); panels.forEach(p=>p.classList.toggle('active', p.dataset.panel===n)); };
+    tabs.appendChild(b);
+  });
+}
+
+buildEntryFields();
+initTabs();
+el('addRowBtn').onclick = upsertRow;
+el('loadDemoBtn').onclick = ()=>{ setDemo(); upsertRow(); };
+el('clearBtn').onclick = clearRows;
+el('pushBackendBtn').onclick = ()=>pushToBackend().catch(e=>alert('保存失败，请先启动 backend/server.py'));
+el('pullBackendBtn').onclick = ()=>pullFromBackend().catch(e=>alert('加载失败，请先启动 backend/server.py'));
+setDemo();
+upsertRow();
+</script>
+</body>
+</html>
